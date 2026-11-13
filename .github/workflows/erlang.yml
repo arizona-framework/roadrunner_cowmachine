@@ -1,0 +1,208 @@
+---
+# Erlang CI — the `rebar3 precommit` gate that contributors run locally
+# (fmt-check, compile, xref, hank, dialyzer, ex_doc, eunit + ct with cover,
+# 100 % line-coverage) is split here into parallel, independently-named jobs
+# so each signal lands as its own check on the PR dashboard and the wall time
+# is the slowest single job instead of the serial sum.
+#
+# Job dependency structure (all fan out from cache-erlang, run in parallel):
+# - cache-erlang: sets up Erlang, computes cache keys, compiles + caches
+#                 _build / rebar3. Exposes cache keys as outputs.
+# - Lint:      fmt-check + xref + hank + ex_doc (fast static checks).
+# - Dialyzer:  PLT analysis on its own (slow, independent).
+# - Test:      eunit + ct (both with cover), then the aggregated 100 %
+#              coverage gate — kept in one job because the gate sums the
+#              eunit + ct coverdata, which must share a workspace.
+#
+# The shared checkout + setup-beam + cache-restore boilerplate lives in the
+# `./.github/actions/setup-erlang` composite action.
+name: Erlang
+
+"on":
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch: {}
+  merge_group:
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cache-erlang:
+    name: Cache Erlang
+
+    runs-on: ubuntu-26.04
+
+    outputs:
+      build-cache-key: ${{ steps.set-build-key.outputs.key }}
+      build-cache-prefix: ${{ steps.set-build-key.outputs.prefix }}
+      rebar-cache-key: ${{ steps.set-rebar-key.outputs.key }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24
+        id: setup-beam
+        with:
+          version-type: strict
+          version-file: .tool-versions
+
+      - name: Set build cache key
+        id: set-build-key
+        run: |
+          # Key is per-commit so each push gets its own _build cache.
+          # actions/cache is immutable per key: a key-based cache hit
+          # skips the post-step upload, so without the SHA component
+          # branches that don't touch rebar.config / rebar.lock would
+          # all share main's cache and downstream jobs (h2spec,
+          # wrk2-smoke) would run against main's stale .beam files
+          # even after cache-erlang recompiled this branch's source.
+          # restore-keys (the prefix) gives a fresh SHA a warm start
+          # from the most recent matching cache.
+          os="${{ runner.os }}"
+          otp="${{ steps.setup-beam.outputs.otp-version }}"
+          cfg_hash="${{ hashFiles('rebar.config') }}"
+          lock_hash="${{ hashFiles('rebar.lock') }}"
+          prefix="_build-${os}-otp-${otp}-cfg-${cfg_hash}-lock-${lock_hash}-"
+          echo "prefix=${prefix}" >> "${GITHUB_OUTPUT}"
+          echo "key=${prefix}sha-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set rebar cache key
+        id: set-rebar-key
+        run: |
+          echo "key=\
+          rebar3-\
+          ${{ runner.os }}-\
+          otp-${{ steps.setup-beam.outputs.otp-version }}-\
+          rebar3-${{ steps.setup-beam.outputs.rebar3-version }}-\
+          config-${{ hashFiles('rebar.config') }}" \
+          >> "${GITHUB_OUTPUT}"
+
+      - name: Cache _build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: _build
+          key: ${{ steps.set-build-key.outputs.key }}
+          restore-keys: ${{ steps.set-build-key.outputs.prefix }}
+
+      - name: Cache rebar3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/rebar3
+          key: ${{ steps.set-rebar-key.outputs.key }}
+          restore-keys: |
+            rebar3-${{ runner.os }}-otp-${{ steps.setup-beam.outputs.otp-version }}-
+            rebar3-${{ runner.os }}-
+
+      - name: Compile test profile
+        run: rebar3 as test compile
+
+  # Fast static checks: fmt-check + xref + hank + ex_doc. All run in seconds,
+  # so they share one job rather than paying the runner-setup tax four times.
+  lint:
+    name: Lint
+
+    needs: cache-erlang
+
+    runs-on: ubuntu-26.04
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-erlang
+        with:
+          build-cache-key: ${{ needs.cache-erlang.outputs.build-cache-key }}
+          build-cache-prefix: ${{ needs.cache-erlang.outputs.build-cache-prefix }}
+          rebar-cache-key: ${{ needs.cache-erlang.outputs.rebar-cache-key }}
+
+      - name: Run lint (fmt-check, xref, hank, doc)
+        run: make lint
+
+  # Dialyzer on its own: it's the slowest non-test stage and fully independent,
+  # so isolating it keeps a type error from hiding behind the test run and lets
+  # it run parallel to Test instead of before it.
+  dialyzer:
+    name: Dialyzer
+
+    needs: cache-erlang
+
+    runs-on: ubuntu-26.04
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-erlang
+        with:
+          build-cache-key: ${{ needs.cache-erlang.outputs.build-cache-key }}
+          build-cache-prefix: ${{ needs.cache-erlang.outputs.build-cache-prefix }}
+          rebar-cache-key: ${{ needs.cache-erlang.outputs.rebar-cache-key }}
+
+      - name: Run dialyzer
+        run: make dialyzer
+
+  # eunit + ct + the 100 % coverage gate on the primary OTP (the
+  # `.tool-versions` dev/CI target). The gate sums the eunit and ct coverdata
+  # (the suite deliberately splits coverage between them), so all three steps
+  # stay in one job to share `_build/test/cover/`. Coverage is intentionally
+  # gated on this version ONLY: which lines a run reaches varies by OTP (e.g.
+  # version-specific guard / library branches), so a 100 % bar across older
+  # runtimes would flap; the older versions run the suite without the gate
+  # below.
+  test:
+    name: Test
+
+    needs: cache-erlang
+
+    runs-on: ubuntu-26.04
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-erlang
+        with:
+          build-cache-key: ${{ needs.cache-erlang.outputs.build-cache-key }}
+          build-cache-prefix: ${{ needs.cache-erlang.outputs.build-cache-prefix }}
+          rebar-cache-key: ${{ needs.cache-erlang.outputs.rebar-cache-key }}
+
+      - name: Run eunit + ct (with cover)
+        run: make eunit ct
+
+      - name: Coverage gate (100 %)
+        run: make cover
+
+  # The same eunit + ct suite on the older supported OTP releases, to prove
+  # behaviour holds on every version the `minimum_otp_vsn` floor claims. No
+  # coverage gate here (coverage is version-specific, see Test above) and no
+  # shared cache (it's keyed on the primary OTP), so these are self-contained
+  # and can't perturb the single-version pipeline. 29 is covered by Test.
+  test-older-otp:
+    name: Test (OTP ${{ matrix.otp }})
+
+    runs-on: ubuntu-26.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        otp: ["27", "28"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: "3"
+
+      - name: Compile
+        run: rebar3 as test compile
+
+      - name: Run eunit + ct
+        run: make eunit ct
