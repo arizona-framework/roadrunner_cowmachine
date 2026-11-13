@@ -19,7 +19,9 @@ for what touches the connection (sending a response, reading the body).
 The listener options mean what `cowmachine_server` says:
 
 - `port`, `ip`, `ipv6_v6only`, and `tls` for HTTPS (the `ssl` server
-  options)
+  options). Over TLS a listener serves HTTP/2 and HTTP/1.1, as Cowboy
+  does, and plain HTTP/1.1 otherwise: Roadrunner can't serve HTTP/1.1 and
+  cleartext HTTP/2 on one port, and browsers only use HTTP/2 over TLS.
 - `backlog`, `max_connections` and `num_acceptors`, Roadrunner's
   `socket_backlog`, `max_clients` and `num_acceptors`
 - `request_timeout`, in milliseconds
@@ -143,7 +145,8 @@ info(Ref) ->
 -spec listener_opt(atom(), term(), roadrunner_listener:opts()) -> roadrunner_listener:opts().
 listener_opt(ip, Ip, Acc) -> Acc#{ip => Ip};
 listener_opt(ipv6_v6only, V6Only, Acc) -> Acc#{ipv6_v6only => V6Only};
-listener_opt(tls, TlsOpts, Acc) -> Acc#{tls => TlsOpts};
+%% Over TLS, HTTP/2 is offered next to HTTP/1.1, as Cowboy does.
+listener_opt(tls, TlsOpts, Acc) -> Acc#{tls => TlsOpts, protocols => [http1, http2]};
 listener_opt(backlog, Backlog, Acc) -> Acc#{socket_backlog => Backlog};
 listener_opt(max_connections, infinity, Acc) -> Acc;
 listener_opt(max_connections, Max, Acc) -> Acc#{max_clients => Max};
