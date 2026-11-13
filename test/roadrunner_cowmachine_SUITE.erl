@@ -292,10 +292,31 @@ tls_listener(_Config) ->
             [{ssl, [{verify, verify_none} | proplists:delete(verify, ClientConfig)]}],
             [{body_format, binary}]
         ),
-        ?assertEqual(~"made", Body)
+        ?assertEqual(~"made", Body),
+        %% HTTP/2 is offered, as on Cowboy, and HTTP/1.1 still served.
+        ?assertEqual({ok, ~"h2"}, alpn(Port, [~"h2", ~"http/1.1"], ClientConfig)),
+        ?assertEqual({ok, ~"http/1.1"}, alpn(Port, [~"http/1.1"], ClientConfig))
     after
         ok = roadrunner_cowmachine:stop_listener(Ref)
     end.
+
+%% The protocol a TLS connection that offers `Protocols` negotiates.
+alpn(Port, Protocols, ClientConfig) ->
+    {ok, Socket} = ssl:connect(
+        "localhost",
+        Port,
+        [
+            binary,
+            {active, false},
+            {verify, verify_none},
+            {alpn_advertised_protocols, Protocols}
+            | proplists:delete(verify, ClientConfig)
+        ],
+        5000
+    ),
+    Negotiated = ssl:negotiated_protocol(Socket),
+    ok = ssl:close(Socket),
+    Negotiated.
 
 ipv4_and_ipv6_share_a_port(_Config) ->
     {ok, _} = roadrunner_cowmachine:start_listener(rr_cm_v4, #{
