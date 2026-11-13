@@ -65,6 +65,7 @@ and `compress` options carry over. A WebSocket needs HTTP/1.1.
     start_listener/2,
     stop_listener/1,
     port/1,
+    info/1,
     reply/4,
     inform/3,
     stream_reply/3,
@@ -117,6 +118,26 @@ stop_listener(Ref) ->
 -spec port(cowmachine_server:listener_ref()) -> inet:port_number().
 port(Ref) ->
     roadrunner_listener:port(name(Ref)).
+
+-doc false.
+-spec info(cowmachine_server:listener_ref()) ->
+    {ok, cowmachine_server:listener_info()} | {error, not_found}.
+info(Ref) ->
+    Name = name(Ref),
+    try
+        #{active_clients := Active, max_clients := Max} = roadrunner_listener:info(Name),
+        %% A Roadrunner listener answers only while it accepts connections:
+        %% a drain holds its calls until it has stopped.
+        {ok, #{
+            status => running,
+            port => roadrunner_listener:port(Name),
+            active_connections => Active,
+            all_connections => Active,
+            max_connections => Max
+        }}
+    catch
+        exit:{noproc, _} -> {error, not_found}
+    end.
 
 %% The Roadrunner listener options a cowmachine listener option sets.
 -spec listener_opt(atom(), term(), roadrunner_listener:opts()) -> roadrunner_listener:opts().

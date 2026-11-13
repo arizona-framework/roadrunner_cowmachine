@@ -42,7 +42,8 @@ what the request's path names.
     websocket_echoes/1,
     tls_listener/1,
     ipv4_and_ipv6_share_a_port/1,
-    listener_options/1
+    listener_options/1,
+    listener_info/1
 ]).
 
 -define(MW, roadrunner_cowmachine_test_mw).
@@ -77,7 +78,8 @@ all() ->
         websocket_echoes,
         tls_listener,
         ipv4_and_ipv6_share_a_port,
-        listener_options
+        listener_options,
+        listener_info
     ].
 
 init_per_suite(Config) ->
@@ -353,6 +355,16 @@ listener_options(_Config) ->
         ok = roadrunner_cowmachine:stop_listener(rr_cm_options)
     end,
     ?assertEqual({error, not_found}, roadrunner_cowmachine:stop_listener(rr_cm_gone)).
+
+%% A listener reports its state, port and connections.
+listener_info(Config) ->
+    Port = ?config(port, Config),
+    {ok, Info} = roadrunner_cowmachine:info(rr_cm_test),
+    ?assertMatch(
+        #{status := running, port := Port, active_connections := 0, all_connections := 0}, Info
+    ),
+    ?assert(is_integer(maps:get(max_connections, Info))),
+    ?assertEqual({error, not_found}, roadrunner_cowmachine:info(rr_cm_gone)).
 
 %% =============================================================================
 %% Helpers

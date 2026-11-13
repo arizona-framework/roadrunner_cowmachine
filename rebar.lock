@@ -3,7 +3,7 @@
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.16.1">>},1},
  {<<"cowmachine">>,
   {git,"https://github.com/williamthome/cowmachine.git",
-       {ref,"8c8f43676c2e257bbf0b1812ad96fa6ec911b3e3"}},
+       {ref,"880135e270a90b99e0814698e30dca131fb1c584"}},
   0},
  {<<"qdate_localtime">>,{pkg,<<"qdate_localtime">>,<<"1.2.2">>},2},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"2.2.0">>},1},
