@@ -128,10 +128,8 @@ info(Ref) ->
     Name = name(Ref),
     try
         #{active_clients := Active, max_clients := Max} = roadrunner_listener:info(Name),
-        %% A Roadrunner listener answers only while it accepts connections:
-        %% a drain holds its calls until it has stopped.
         {ok, #{
-            status => running,
+            status => listener_status(roadrunner_listener:status(Name)),
             port => roadrunner_listener:port(Name),
             active_connections => Active,
             all_connections => Active,
@@ -140,6 +138,12 @@ info(Ref) ->
     catch
         exit:{noproc, _} -> {error, not_found}
     end.
+
+%% A draining listener accepts no new connections, as a suspended Ranch
+%% listener.
+-spec listener_status(accepting | draining) -> running | suspended.
+listener_status(accepting) -> running;
+listener_status(draining) -> suspended.
 
 %% The Roadrunner listener options a cowmachine listener option sets.
 -spec listener_opt(atom(), term(), roadrunner_listener:opts()) -> roadrunner_listener:opts().

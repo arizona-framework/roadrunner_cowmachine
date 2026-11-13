@@ -9,7 +9,7 @@
  {<<"ranch">>,{pkg,<<"ranch">>,<<"2.2.0">>},1},
  {<<"roadrunner">>,
   {git,"https://github.com/arizona-framework/roadrunner.git",
-       {ref,"24f45e4449b868e849c27e0d631ce50e1070ce07"}},
+       {ref,"0fcb93530071bcaabaa1f1452c82f29a31116c53"}},
   0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.9">>},3},
  {<<"tls_certificate_check">>,
