@@ -1,0 +1,36 @@
+{"1.2.0",
+[{<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.15.0">>},1},
+ {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.16.1">>},1},
+ {<<"cowmachine">>,
+  {git,"https://github.com/williamthome/cowmachine.git",
+       {ref,"880135e270a90b99e0814698e30dca131fb1c584"}},
+  0},
+ {<<"qdate_localtime">>,{pkg,<<"qdate_localtime">>,<<"1.2.2">>},2},
+ {<<"ranch">>,{pkg,<<"ranch">>,<<"2.2.0">>},1},
+ {<<"roadrunner">>,
+  {git,"https://github.com/arizona-framework/roadrunner.git",
+       {ref,"24f45e4449b868e849c27e0d631ce50e1070ce07"}},
+  0},
+ {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.9">>},3},
+ {<<"tls_certificate_check">>,
+  {pkg,<<"tls_certificate_check">>,<<"1.36.0">>},
+  2},
+ {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.28.1">>},1}]}.
+[
+{pkg_hash,[
+ {<<"cowboy">>, <<"9CFE86ED7117BF045E10ADBEDB0170AF7BE57F2A3637E7BE143433D8DD267396">>},
+ {<<"cowlib">>, <<"318D385D55F657E9A5005838C4E426E13DCD724A691438384B6165A69687E531">>},
+ {<<"qdate_localtime">>, <<"43E1B20102F50A8B2A2BE7042C2F6BE989AD96CA2CC319DB5DF56E122E8873F6">>},
+ {<<"ranch">>, <<"25528F82BC8D7C6152C57666CA99EC716510FE0925CB188172F41CE93117B1B0">>},
+ {<<"ssl_verify_fun">>, <<"4FF292DC16E728FDE1235CF5FA6BCD3CA01864004526F71A4A70935509D1A7F1">>},
+ {<<"tls_certificate_check">>, <<"BCB153E8A6193CAFD178040307C4E7E5C67075C2AD1CFB28EBC87E12E04B85CB">>},
+ {<<"zotonic_stdlib">>, <<"324DAFD8E1E5B40D10C9D75662479F86D0218A471B9816C51667EF4FBFE89AF0">>}]},
+{pkg_hash_ext,[
+ {<<"cowboy">>, <<"179FB65140FB440A17B767AD53B755081506F9596C4DB5C49C0396D8C8643668">>},
+ {<<"cowlib">>, <<"58F1E425A9E04176F1D30E20116F57C4E90EF0E187552E9741C465BDF4044F70">>},
+ {<<"qdate_localtime">>, <<"A38D5F1C5AE14B22F471E442B262AECCAFB915B664C7C364443DC73179C50FDA">>},
+ {<<"ranch">>, <<"FA0B99A1780C80218A4197A59EA8D3BDAE32FBFF7E88527D7D8A4787EFF4F8E7">>},
+ {<<"ssl_verify_fun">>, <<"19F24AD715EF6255D530B2F0DB8B2D2191AE435B6527234E943F523E84ED0895">>},
+ {<<"tls_certificate_check">>, <<"E58B8626336B9CD483F0FD8346AF501DE648A07093B077BE442F29EF6DB28EF1">>},
+ {<<"zotonic_stdlib">>, <<"216A172BE6CA48FF2CFC61864EBC2298C81CB03E624AF87191B44C86C2F0690E">>}]}
+].

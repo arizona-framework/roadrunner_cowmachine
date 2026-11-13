@@ -1,0 +1,21 @@
+{application, roadrunner_cowmachine, [
+    {description, "cowmachine adapter for the roadrunner HTTP server."},
+    {vsn, semver},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        roadrunner,
+        cowmachine
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [
+        {"GitHub", "https://github.com/arizona-framework/roadrunner_cowmachine"},
+        {"Docs", "https://hexdocs.pm/roadrunner_cowmachine"},
+        {"Issues", "https://github.com/arizona-framework/roadrunner_cowmachine/issues"},
+        {"Roadrunner", "https://github.com/arizona-framework/roadrunner"},
+        {"cowmachine", "https://github.com/zotonic/cowmachine"}
+    ]}
+]}.
