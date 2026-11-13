@@ -377,7 +377,8 @@ listener_options(_Config) ->
     end,
     ?assertEqual({error, not_found}, roadrunner_cowmachine:stop_listener(rr_cm_gone)).
 
-%% A listener reports its state, port and connections.
+%% A listener reports its state, port and connections; one draining accepts
+%% no new connections, as a suspended Ranch listener.
 listener_info(Config) ->
     Port = ?config(port, Config),
     {ok, Info} = roadrunner_cowmachine:info(rr_cm_test),
@@ -385,7 +386,38 @@ listener_info(Config) ->
         #{status := running, port := Port, active_connections := 0, all_connections := 0}, Info
     ),
     ?assert(is_integer(maps:get(max_connections, Info))),
-    ?assertEqual({error, not_found}, roadrunner_cowmachine:info(rr_cm_gone)).
+    ?assertEqual({error, not_found}, roadrunner_cowmachine:info(rr_cm_gone)),
+    %% A request still reading its body holds the drain open.
+    {ok, Socket} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+    ok = gen_tcp:send(Socket, [
+        ~"POST /read_body HTTP/1.1\r\ncontent-length: 100\r\n", headers(), ~"\r\n", ~"part"
+    ]),
+    ok = wait_for_connection(rr_cm_test),
+    Self = self(),
+    _ = spawn(fun() -> Self ! {drained, roadrunner_listener:drain(rr_cm_test, 5000)} end),
+    ok = wait_for_draining(rr_cm_test),
+    ?assertMatch(
+        {ok, #{status := suspended, active_connections := 1}},
+        roadrunner_cowmachine:info(rr_cm_test)
+    ),
+    ok = gen_tcp:close(Socket),
+    receive
+        {drained, _} -> ok
+    end,
+    %% The drained listener is gone; start one for end_per_testcase to stop.
+    {ok, _} = roadrunner_cowmachine:start_listener(rr_cm_test, #{port => 0, middlewares => [?MW]}).
+
+wait_for_connection(Name) ->
+    case roadrunner_listener:info(Name) of
+        #{active_clients := 1} -> ok;
+        #{} -> wait_for_connection(Name)
+    end.
+
+wait_for_draining(Name) ->
+    case roadrunner_listener:status(Name) of
+        draining -> ok;
+        accepting -> wait_for_draining(Name)
+    end.
 
 %% =============================================================================
 %% Helpers
